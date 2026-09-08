@@ -72,6 +72,8 @@ Luca.AI BOT
 ├── main.py
 │   └── Inicialização da aplicação e registro dos routers
 │
+
+
 ├── routers/
 │   ├── clientes.py
 │   │   └── Endpoints relacionados aos clientes
@@ -79,18 +81,28 @@ Luca.AI BOT
 │   └── mensagens.py
 │       └── Endpoints relacionados às mensagens
 │
+
+
 ├── models.py
 │   └── Modelos das entidades do banco de dados
 │
+
+
 ├── schemas.py
 │   └── Validação dos dados recebidos pela API
 │
+
+
 ├── database.py
 │   └── Configuração e conexão com o banco de dados
 │
+
+
 ├── luca_bot.py
 │   └── Motor responsável pela geração das respostas
 │
+
+
 └── requirements.txt
     └── Dependências do projeto
 
