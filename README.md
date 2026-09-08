@@ -75,10 +75,12 @@ Luca.AI BOT
 
 
 ├── routers/
-│   ├── clientes.py
+│   
+├── clientes.py
 │   │   └── Endpoints relacionados aos clientes
 │   │
-│   └── mensagens.py
+│   
+└── mensagens.py
 │       └── Endpoints relacionados às mensagens
 │
 
