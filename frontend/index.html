@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Luca.AI BOT — operação</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["IBM Plex Sans", "ui-sans-serif", "system-ui", "sans-serif"],
+            mono: ["IBM Plex Mono", "ui-monospace", "monospace"],
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-feature-settings: "ss01"; }
+    .bar { height: 8px; background: #111; }
+  </style>
+</head>
+<body class="bg-white text-neutral-900">
+  <header class="border-b border-neutral-200">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p class="text-xs uppercase tracking-wide text-neutral-500">CP2 · mensageria inteligente</p>
+        <h1 class="text-2xl font-semibold">Luca.AI BOT</h1>
+        <p class="text-sm text-neutral-600">Atendimento inicial, histórico e operação — dados reais da API.</p>
+      </div>
+      <p id="status-api" class="text-sm font-mono text-neutral-500">conectando…</p>
+    </div>
+    <nav class="max-w-6xl mx-auto px-4 pb-3 flex gap-2 text-sm">
+      <button data-tab="dashboard" class="tab px-3 py-1 border border-neutral-900 bg-neutral-900 text-white">Dashboard</button>
+      <button data-tab="atendimento" class="tab px-3 py-1 border border-neutral-300">Atendimento</button>
+      <button data-tab="clientes" class="tab px-3 py-1 border border-neutral-300">Clientes</button>
+      <button data-tab="relatorio" class="tab px-3 py-1 border border-neutral-300">Relatório</button>
+    </nav>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-8">
+    <p id="toast" class="hidden text-sm border px-3 py-2"></p>
+
+    <section id="view-dashboard" class="space-y-6">
+      <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+      <div id="alertas" class="space-y-2"></div>
+      <div class="grid md:grid-cols-2 gap-8">
+        <div>
+          <h2 class="text-sm font-semibold mb-3">Volume por intenção</h2>
+          <div id="intencoes" class="space-y-2"></div>
+        </div>
+        <div>
+          <h2 class="text-sm font-semibold mb-3">Últimas conversas</h2>
+          <div id="historico" class="space-y-3 text-sm"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-atendimento" class="hidden grid md:grid-cols-[280px_1fr] gap-6">
+      <aside class="space-y-3">
+        <h2 class="text-sm font-semibold">Cliente</h2>
+        <select id="select-cliente" class="w-full border border-neutral-300 px-2 py-2 text-sm"></select>
+        <p class="text-xs text-neutral-500">A resposta usa LLM se houver chave; senão, as regras do CP1.</p>
+      </aside>
+      <div>
+        <div id="chat" class="border border-neutral-200 min-h-[320px] p-4 space-y-3 text-sm"></div>
+        <form id="form-msg" class="mt-3 flex gap-2">
+          <input id="texto-msg" required maxlength="500" placeholder="Mensagem do cliente" class="flex-1 border border-neutral-300 px-3 py-2 text-sm">
+          <button class="px-4 py-2 bg-neutral-900 text-white text-sm">Enviar</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-clientes" class="hidden space-y-6">
+      <form id="form-cliente" class="grid md:grid-cols-4 gap-3 items-end">
+        <label class="text-sm">Nome
+          <input name="nome" required minlength="2" class="mt-1 w-full border border-neutral-300 px-2 py-2">
+        </label>
+        <label class="text-sm">Telefone
+          <input name="telefone" required class="mt-1 w-full border border-neutral-300 px-2 py-2">
+        </label>
+        <label class="text-sm">E-mail
+          <input name="email" type="email" class="mt-1 w-full border border-neutral-300 px-2 py-2">
+        </label>
+        <button class="px-4 py-2 bg-neutral-900 text-white text-sm h-[42px]">Cadastrar</button>
+      </form>
+      <div class="flex gap-2">
+        <input id="busca-cliente" placeholder="Buscar nome, telefone ou e-mail" class="flex-1 border border-neutral-300 px-3 py-2 text-sm">
+        <button id="btn-busca" class="px-3 py-2 border border-neutral-300 text-sm">Filtrar</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left border-b border-neutral-200">
+              <th class="py-2">ID</th><th>Nome</th><th>Telefone</th><th>E-mail</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-clientes"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="view-relatorio" class="hidden space-y-4">
+      <p class="text-sm text-neutral-600 max-w-2xl">
+        O relatório lê as últimas mensagens classificadas (intenção, urgência, sentimento).
+        Com <span class="font-mono">OPENAI_API_KEY</span> a LLM redige o texto; sem chave, sai o consolidado local.
+      </p>
+      <button id="btn-relatorio" class="px-4 py-2 bg-neutral-900 text-white text-sm">Gerar relatório</button>
+      <article id="relatorio" class="border border-neutral-200 p-4 text-sm space-y-3 hidden"></article>
+    </section>
+  </main>
+
+  <script>
+    const api = "";
+    const toastEl = document.getElementById("toast");
+
+    function toast(msg, ok = true) {
+      toastEl.textContent = msg;
+      toastEl.className = "text-sm border px-3 py-2 " + (ok ? "border-emerald-700 text-emerald-800" : "border-red-700 text-red-800");
+    }
+
+    async function req(path, options = {}) {
+      const res = await fetch(api + path, {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      });
+      let data = null;
+      const text = await res.text();
+      if (text) {
+        try { data = JSON.parse(text); } catch { data = { erro: text }; }
+      }
+      if (!res.ok) {
+        const msg = (data && (data.erro || data.detail)) || ("HTTP " + res.status);
+        throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+      }
+      return data;
+    }
+
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((b) => {
+          b.className = "tab px-3 py-1 border border-neutral-300";
+        });
+        btn.className = "tab px-3 py-1 border border-neutral-900 bg-neutral-900 text-white";
+        ["dashboard", "atendimento", "clientes", "relatorio"].forEach((id) => {
+          document.getElementById("view-" + id).classList.toggle("hidden", id !== btn.dataset.tab);
+        });
+        if (btn.dataset.tab === "dashboard") loadDashboard();
+        if (btn.dataset.tab === "clientes") loadClientes();
+        if (btn.dataset.tab === "atendimento") loadClientesSelect();
+      });
+    });
+
+    async function loadStatus() {
+      try {
+        const s = await req("/api/status");
+        document.getElementById("status-api").textContent = s.nome + " " + s.versao + " · " + s.checkpoint;
+      } catch (err) {
+        document.getElementById("status-api").textContent = "API offline";
+      }
+    }
+
+    function kpi(label, value) {
+      return `<div class="border-t border-neutral-900 pt-2">
+        <p class="text-xs text-neutral-500">${label}</p>
+        <p class="text-2xl font-semibold font-mono">${value}</p>
+      </div>`;
+    }
+
+    async function loadDashboard() {
+      try {
+        const d = await req("/dashboard");
+        const k = d.indicadores;
+        document.getElementById("kpis").innerHTML = [
+          kpi("Clientes", k.clientes),
+          kpi("Mensagens", k.mensagens),
+          kpi("Hoje", k.mensagens_hoje),
+          kpi("Reclamações", k.reclamacoes),
+        ].join("");
+        const max = Math.max(1, ...d.intencoes.map((i) => i.total));
+        document.getElementById("intencoes").innerHTML = d.intencoes.map((i) => `
+          <div>
+            <div class="flex justify-between text-xs mb-1"><span>${i.intencao}</span><span class="font-mono">${i.total}</span></div>
+            <div class="bg-neutral-100"><div class="bar" style="width:${(i.total / max) * 100}%"></div></div>
+          </div>`).join("");
+        document.getElementById("alertas").innerHTML = (d.alertas || []).map((a) =>
+          `<p class="text-sm border-l-4 border-red-700 pl-3">${a.texto}</p>`
+        ).join("") || `<p class="text-sm text-neutral-500">Sem alertas no momento.</p>`;
+        document.getElementById("historico").innerHTML = (d.historico || []).map((h) => `
+          <div class="border-b border-neutral-100 pb-2">
+            <p class="font-medium">${h.cliente} · ${h.intencao} · ${h.urgencia}</p>
+            <p class="text-neutral-600">${h.texto}</p>
+            <p class="text-neutral-800">${h.resposta}</p>
+          </div>`).join("") || "<p class='text-neutral-500'>Nenhuma conversa ainda.</p>";
+      } catch (err) {
+        toast(err.message, false);
+      }
+    }
+
+    async function loadClientes(q = "") {
+      const qs = q ? `?q=${encodeURIComponent(q)}&limit=50` : "?limit=50";
+      const data = await req("/clientes" + qs);
+      document.getElementById("tabela-clientes").innerHTML = data.clientes.map((c) =>
+        `<tr class="border-b border-neutral-100">
+          <td class="py-2 font-mono">${c.id}</td>
+          <td>${c.nome}</td>
+          <td class="font-mono">${c.telefone}</td>
+          <td>${c.email || "—"}</td>
+        </tr>`
+      ).join("") || `<tr><td colspan="4" class="py-3 text-neutral-500">Nenhum cliente.</td></tr>`;
+      return data.clientes;
+    }
+
+    async function loadClientesSelect() {
+      const data = await req("/clientes?limit=100");
+      const sel = document.getElementById("select-cliente");
+      sel.innerHTML = data.clientes.map((c) =>
+        `<option value="${c.id}">${c.id} · ${c.nome}</option>`
+      ).join("");
+      if (data.clientes[0]) loadChat(data.clientes[0].id);
+    }
+
+    async function loadChat(clienteId) {
+      const data = await req(`/clientes/${clienteId}/mensagens?limit=50`);
+      const box = document.getElementById("chat");
+      const msgs = [...(data.mensagens || [])].reverse();
+      box.innerHTML = msgs.map((m) => `
+        <div>
+          <p class="text-neutral-500 text-xs">${m.intencao} · ${m.origem_resposta}</p>
+          <p><span class="font-medium">Cliente:</span> ${m.texto}</p>
+          <p><span class="font-medium">Bot:</span> ${m.resposta}</p>
+        </div>
+      `).join("") || "<p class='text-neutral-500'>Sem histórico. Envie a primeira mensagem.</p>";
+      box.scrollTop = box.scrollHeight;
+    }
+
+    document.getElementById("select-cliente").addEventListener("change", (e) => loadChat(e.target.value));
+
+    document.getElementById("form-msg").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const clienteId = document.getElementById("select-cliente").value;
+      const texto = document.getElementById("texto-msg").value.trim();
+      if (!clienteId) return toast("Cadastre um cliente antes.", false);
+      try {
+        await req("/mensagens", { method: "POST", body: JSON.stringify({ cliente_id: Number(clienteId), texto }) });
+        document.getElementById("texto-msg").value = "";
+        toast("Mensagem processada.");
+        await loadChat(clienteId);
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+
+    document.getElementById("form-cliente").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const payload = { nome: fd.get("nome"), telefone: fd.get("telefone"), email: fd.get("email") || null };
+      try {
+        await req("/clientes", { method: "POST", body: JSON.stringify(payload) });
+        e.target.reset();
+        toast("Cliente cadastrado.");
+        await loadClientes();
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+
+    document.getElementById("btn-busca").addEventListener("click", () => {
+      loadClientes(document.getElementById("busca-cliente").value).catch((err) => toast(err.message, false));
+    });
+
+    document.getElementById("btn-relatorio").addEventListener("click", async () => {
+      try {
+        const r = await req("/relatorios", { method: "POST", body: JSON.stringify({ limite: 40 }) });
+        const el = document.getElementById("relatorio");
+        el.classList.remove("hidden");
+        el.innerHTML = `
+          <p class="text-xs font-mono text-neutral-500">${r.origem} · ${r.modelo} · ${r.total_analisado} msgs</p>
+          <p>${r.resumo}</p>
+          <p class="font-medium">Riscos</p>
+          <ul class="list-disc pl-5">${r.riscos.map((x) => `<li>${x}</li>`).join("")}</ul>
+          <p class="font-medium">Recomendações</p>
+          <ul class="list-disc pl-5">${r.recomendacoes.map((x) => `<li>${x}</li>`).join("")}</ul>
+        `;
+        toast("Relatório gerado.");
+      } catch (err) {
+        toast(err.message, false);
+      }
+    });
+
+    loadStatus();
+    loadDashboard();
+  </script>
+</body>
+</html>
