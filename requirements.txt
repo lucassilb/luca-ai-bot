@@ -1,5 +1,8 @@
-fastapi
+fastapi>=0.110
 uvicorn
-sqlalchemy
-pydantic
+sqlalchemy>=2.0
+pydantic>=2.0
+pydantic[email]
 email-validator
+httpx
+pytest
