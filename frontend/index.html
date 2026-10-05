@@ -64,7 +64,7 @@
       <aside class="space-y-3">
         <h2 class="text-sm font-semibold">Cliente</h2>
         <select id="select-cliente" class="w-full border border-neutral-300 px-2 py-2 text-sm"></select>
-        <p class="text-xs text-neutral-500">A resposta usa LLM se houver chave; senão, as regras do CP1.</p>
+        <p class="text-xs text-neutral-500">A resposta usa o Ollama local quando ativo; caso contrário, usa as regras do CP1.</p>
       </aside>
       <div>
         <div id="chat" class="border border-neutral-200 min-h-[320px] p-4 space-y-3 text-sm"></div>
@@ -86,7 +86,10 @@
         <label class="text-sm">E-mail
           <input name="email" type="email" class="mt-1 w-full border border-neutral-300 px-2 py-2">
         </label>
-        <button class="px-4 py-2 bg-neutral-900 text-white text-sm h-[42px]">Cadastrar</button>
+        <div class="flex gap-2">
+          <button id="btn-salvar-cliente" class="px-4 py-2 bg-neutral-900 text-white text-sm h-[42px]">Cadastrar</button>
+          <button id="btn-cancelar-edicao" type="button" class="hidden px-3 py-2 border border-neutral-300 text-sm">Cancelar</button>
+        </div>
       </form>
       <div class="flex gap-2">
         <input id="busca-cliente" placeholder="Buscar nome, telefone ou e-mail" class="flex-1 border border-neutral-300 px-3 py-2 text-sm">
@@ -96,7 +99,7 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="text-left border-b border-neutral-200">
-              <th class="py-2">ID</th><th>Nome</th><th>Telefone</th><th>E-mail</th>
+              <th class="py-2">ID</th><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Ações</th>
             </tr>
           </thead>
           <tbody id="tabela-clientes"></tbody>
@@ -107,7 +110,7 @@
     <section id="view-relatorio" class="hidden space-y-4">
       <p class="text-sm text-neutral-600 max-w-2xl">
         O relatório lê as últimas mensagens classificadas (intenção, urgência, sentimento).
-        Com <span class="font-mono">OPENAI_API_KEY</span> a LLM redige o texto; sem chave, sai o consolidado local.
+        Com o Ollama local ativo, a LLM redige o texto; sem ele, sai o consolidado por regras.
       </p>
       <button id="btn-relatorio" class="px-4 py-2 bg-neutral-900 text-white text-sm">Gerar relatório</button>
       <article id="relatorio" class="border border-neutral-200 p-4 text-sm space-y-3 hidden"></article>
@@ -117,6 +120,14 @@
   <script>
     const api = "";
     const toastEl = document.getElementById("toast");
+    let displayedClients = [];
+    let editingClientId = null;
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      })[char]);
+    }
 
     function toast(msg, ok = true) {
       toastEl.textContent = msg;
@@ -149,9 +160,8 @@
         ["dashboard", "atendimento", "clientes", "relatorio"].forEach((id) => {
           document.getElementById("view-" + id).classList.toggle("hidden", id !== btn.dataset.tab);
         });
-        if (btn.dataset.tab === "dashboard") loadDashboard();
-        if (btn.dataset.tab === "clientes") loadClientes();
-        if (btn.dataset.tab === "atendimento") loadClientesSelect();
+        const action = { dashboard: loadDashboard, clientes: loadClientes, atendimento: loadClientesSelect }[btn.dataset.tab];
+        if (action) action().catch((err) => toast(err.message, false));
       });
     });
 
@@ -166,8 +176,8 @@
 
     function kpi(label, value) {
       return `<div class="border-t border-neutral-900 pt-2">
-        <p class="text-xs text-neutral-500">${label}</p>
-        <p class="text-2xl font-semibold font-mono">${value}</p>
+        <p class="text-xs text-neutral-500">${escapeHtml(label)}</p>
+        <p class="text-2xl font-semibold font-mono">${escapeHtml(value)}</p>
       </div>`;
     }
 
@@ -184,17 +194,17 @@
         const max = Math.max(1, ...d.intencoes.map((i) => i.total));
         document.getElementById("intencoes").innerHTML = d.intencoes.map((i) => `
           <div>
-            <div class="flex justify-between text-xs mb-1"><span>${i.intencao}</span><span class="font-mono">${i.total}</span></div>
-            <div class="bg-neutral-100"><div class="bar" style="width:${(i.total / max) * 100}%"></div></div>
+            <div class="flex justify-between text-xs mb-1"><span>${escapeHtml(i.intencao)}</span><span class="font-mono">${escapeHtml(i.total)}</span></div>
+            <div class="bg-neutral-100"><div class="bar" style="width:${Math.max(0, Math.min(100, (Number(i.total) / max) * 100))}%"></div></div>
           </div>`).join("");
         document.getElementById("alertas").innerHTML = (d.alertas || []).map((a) =>
-          `<p class="text-sm border-l-4 border-red-700 pl-3">${a.texto}</p>`
+          `<p class="text-sm border-l-4 border-red-700 pl-3">${escapeHtml(a.texto)}</p>`
         ).join("") || `<p class="text-sm text-neutral-500">Sem alertas no momento.</p>`;
         document.getElementById("historico").innerHTML = (d.historico || []).map((h) => `
           <div class="border-b border-neutral-100 pb-2">
-            <p class="font-medium">${h.cliente} · ${h.intencao} · ${h.urgencia}</p>
-            <p class="text-neutral-600">${h.texto}</p>
-            <p class="text-neutral-800">${h.resposta}</p>
+            <p class="font-medium">${escapeHtml(h.cliente)} · ${escapeHtml(h.intencao)} · ${escapeHtml(h.urgencia)}</p>
+            <p class="text-neutral-600">${escapeHtml(h.texto)}</p>
+            <p class="text-neutral-800">${escapeHtml(h.resposta)}</p>
           </div>`).join("") || "<p class='text-neutral-500'>Nenhuma conversa ainda.</p>";
       } catch (err) {
         toast(err.message, false);
@@ -204,14 +214,16 @@
     async function loadClientes(q = "") {
       const qs = q ? `?q=${encodeURIComponent(q)}&limit=50` : "?limit=50";
       const data = await req("/clientes" + qs);
+      displayedClients = data.clientes;
       document.getElementById("tabela-clientes").innerHTML = data.clientes.map((c) =>
         `<tr class="border-b border-neutral-100">
-          <td class="py-2 font-mono">${c.id}</td>
-          <td>${c.nome}</td>
-          <td class="font-mono">${c.telefone}</td>
-          <td>${c.email || "—"}</td>
+          <td class="py-2 font-mono">${escapeHtml(c.id)}</td>
+          <td>${escapeHtml(c.nome)}</td>
+          <td class="font-mono">${escapeHtml(c.telefone)}</td>
+          <td>${escapeHtml(c.email || "—")}</td>
+          <td><button type="button" data-edit-id="${Number(c.id)}" class="text-sm underline">Editar</button></td>
         </tr>`
-      ).join("") || `<tr><td colspan="4" class="py-3 text-neutral-500">Nenhum cliente.</td></tr>`;
+      ).join("") || `<tr><td colspan="5" class="py-3 text-neutral-500">Nenhum cliente.</td></tr>`;
       return data.clientes;
     }
 
@@ -219,9 +231,9 @@
       const data = await req("/clientes?limit=100");
       const sel = document.getElementById("select-cliente");
       sel.innerHTML = data.clientes.map((c) =>
-        `<option value="${c.id}">${c.id} · ${c.nome}</option>`
+        `<option value="${Number(c.id)}">${escapeHtml(c.id)} · ${escapeHtml(c.nome)}</option>`
       ).join("");
-      if (data.clientes[0]) loadChat(data.clientes[0].id);
+      if (data.clientes[0]) await loadChat(data.clientes[0].id);
     }
 
     async function loadChat(clienteId) {
@@ -230,15 +242,40 @@
       const msgs = [...(data.mensagens || [])].reverse();
       box.innerHTML = msgs.map((m) => `
         <div>
-          <p class="text-neutral-500 text-xs">${m.intencao} · ${m.origem_resposta}</p>
-          <p><span class="font-medium">Cliente:</span> ${m.texto}</p>
-          <p><span class="font-medium">Bot:</span> ${m.resposta}</p>
+          <p class="text-neutral-500 text-xs">${escapeHtml(m.intencao)} · ${escapeHtml(m.origem_resposta)}</p>
+          <p><span class="font-medium">Cliente:</span> ${escapeHtml(m.texto)}</p>
+          <p><span class="font-medium">Bot:</span> ${escapeHtml(m.resposta)}</p>
         </div>
       `).join("") || "<p class='text-neutral-500'>Sem histórico. Envie a primeira mensagem.</p>";
       box.scrollTop = box.scrollHeight;
     }
 
-    document.getElementById("select-cliente").addEventListener("change", (e) => loadChat(e.target.value));
+    document.getElementById("select-cliente").addEventListener("change", (e) => {
+      loadChat(e.target.value).catch((err) => toast(err.message, false));
+    });
+
+    function cancelarEdicao() {
+      editingClientId = null;
+      document.getElementById("form-cliente").reset();
+      document.getElementById("btn-salvar-cliente").textContent = "Cadastrar";
+      document.getElementById("btn-cancelar-edicao").classList.add("hidden");
+    }
+
+    document.getElementById("btn-cancelar-edicao").addEventListener("click", cancelarEdicao);
+    document.getElementById("tabela-clientes").addEventListener("click", (e) => {
+      const button = e.target.closest("[data-edit-id]");
+      if (!button) return;
+      const cliente = displayedClients.find((c) => c.id === Number(button.dataset.editId));
+      if (!cliente) return;
+      editingClientId = cliente.id;
+      const form = document.getElementById("form-cliente");
+      form.elements.nome.value = cliente.nome;
+      form.elements.telefone.value = cliente.telefone;
+      form.elements.email.value = cliente.email || "";
+      document.getElementById("btn-salvar-cliente").textContent = "Salvar";
+      document.getElementById("btn-cancelar-edicao").classList.remove("hidden");
+      form.elements.nome.focus();
+    });
 
     document.getElementById("form-msg").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -260,9 +297,12 @@
       const fd = new FormData(e.target);
       const payload = { nome: fd.get("nome"), telefone: fd.get("telefone"), email: fd.get("email") || null };
       try {
-        await req("/clientes", { method: "POST", body: JSON.stringify(payload) });
-        e.target.reset();
-        toast("Cliente cadastrado.");
+        const editando = editingClientId !== null;
+        await req(editando ? `/clientes/${editingClientId}` : "/clientes", {
+          method: editando ? "PUT" : "POST", body: JSON.stringify(payload),
+        });
+        cancelarEdicao();
+        toast(editando ? "Cliente atualizado." : "Cliente cadastrado.");
         await loadClientes();
       } catch (err) {
         toast(err.message, false);
@@ -279,12 +319,12 @@
         const el = document.getElementById("relatorio");
         el.classList.remove("hidden");
         el.innerHTML = `
-          <p class="text-xs font-mono text-neutral-500">${r.origem} · ${r.modelo} · ${r.total_analisado} msgs</p>
-          <p>${r.resumo}</p>
+          <p class="text-xs font-mono text-neutral-500">${escapeHtml(r.origem)} · ${escapeHtml(r.modelo)} · ${escapeHtml(r.total_analisado)} msgs</p>
+          <p>${escapeHtml(r.resumo)}</p>
           <p class="font-medium">Riscos</p>
-          <ul class="list-disc pl-5">${r.riscos.map((x) => `<li>${x}</li>`).join("")}</ul>
+          <ul class="list-disc pl-5">${r.riscos.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
           <p class="font-medium">Recomendações</p>
-          <ul class="list-disc pl-5">${r.recomendacoes.map((x) => `<li>${x}</li>`).join("")}</ul>
+          <ul class="list-disc pl-5">${r.recomendacoes.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
         `;
         toast("Relatório gerado.");
       } catch (err) {

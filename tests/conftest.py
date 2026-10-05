@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-os.environ.pop("OPENAI_API_KEY", None)
+os.environ["OLLAMA_ENABLED"] = "0"
+os.environ["OLLAMA_BASE_URL"] = "http://127.0.0.1:11434"
+os.environ["OLLAMA_MODEL"] = "qwen2.5:3b"
 
 from database import Base, get_db
 from main import app

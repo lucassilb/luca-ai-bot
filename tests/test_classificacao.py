@@ -21,7 +21,7 @@ def test_compatibilidade_cp1_gerar_resposta():
 
 
 def test_resposta_completa_sem_llm_usa_regras(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OLLAMA_ENABLED", raising=False)
     resultado = gerar_resposta_completa("quero falar com um atendente")
     assert resultado["origem_resposta"] == "regras"
     assert resultado["intencao"] == "atendente"

@@ -6,6 +6,17 @@ def test_status(client):
     assert corpo["checkpoint"] == "CP2"
 
 
+def test_frontend_e_swagger_sao_servidos(client):
+    pagina = client.get("/")
+    assert pagina.status_code == 200
+    assert "text/html" in pagina.headers["content-type"]
+    assert "form-cliente" in pagina.text
+    assert "view-dashboard" in pagina.text
+
+    schema = client.get("/openapi.json").json()
+    assert {"/clientes", "/mensagens", "/dashboard", "/relatorios"} <= set(schema["paths"])
+
+
 def test_criar_cliente_e_validar_telefone(client):
     ok = client.post(
         "/clientes",
@@ -100,3 +111,7 @@ def test_atualizar_cliente_parcial(client):
     assert atualizado.status_code == 200
     assert atualizado.json()["cliente"]["nome"] == "Felipe C."
     assert atualizado.json()["cliente"]["telefone"] == "11988887776"
+
+    sem_email = client.put(f"/clientes/{criado['id']}", json={"email": None})
+    assert sem_email.status_code == 200
+    assert sem_email.json()["cliente"]["email"] is None

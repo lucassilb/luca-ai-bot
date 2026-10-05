@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Cliente, Mensagem
 from services.classificacao import INTENCOES
-from services.llm import llm_configurado, modelo_atual
+from services.llm import llm_disponivel, modelo_atual
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -20,6 +20,7 @@ def _contagem(db: Session, coluna) -> dict[str, int]:
 @router.get("", summary="Indicadores operacionais do atendimento")
 def obter_dashboard(db: Session = Depends(get_db)):
     agora = datetime.utcnow()
+    llm_ativa = llm_disponivel()
     inicio_hoje = agora.replace(hour=0, minute=0, second=0, microsecond=0)
     inicio_semana = agora - timedelta(days=7)
 
@@ -89,8 +90,8 @@ def obter_dashboard(db: Session = Depends(get_db)):
             "mensagens_7d": mensagens_semana,
             "reclamacoes": reclamacoes,
             "urgencia_alta": alta,
-            "llm_ativa": llm_configurado(),
-            "llm_modelo": modelo_atual() if llm_configurado() else None,
+            "llm_ativa": llm_ativa,
+            "llm_modelo": modelo_atual() if llm_ativa else None,
         },
         "intencoes": intencoes,
         "urgencia": por_urgencia,

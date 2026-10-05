@@ -81,7 +81,7 @@ def atualizar_cliente(cliente_id: int, dados: ClienteUpdate, db: Session = Depen
         if _telefone_em_uso(db, dados.telefone, ignorar_id=cliente.id):
             raise HTTPException(status_code=409, detail="Já existe um cliente com este telefone.")
         cliente.telefone = dados.telefone
-    if dados.email is not None:
+    if "email" in dados.model_fields_set:
         cliente.email = dados.email
 
     db.commit()

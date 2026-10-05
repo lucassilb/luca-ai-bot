@@ -32,7 +32,12 @@ def _relatorio_local(intencoes: dict[str, int], total: int, reclamacoes: int, al
     return {"resumo": resumo, "riscos": riscos, "recomendacoes": recomendacoes}
 
 
-@router.post("", response_model=RelatorioOut, summary="Gerar relatório operacional com LLM")
+@router.post(
+    "",
+    response_model=RelatorioOut,
+    summary="Gerar relatório operacional (Ollama local ou regras)",
+    description="Analisa mensagens salvas. Envia à LLM local apenas contagens e rótulos, sem textos ou contatos.",
+)
 def gerar_relatorio(pedido: RelatorioRequest, db: Session = Depends(get_db)):
     consulta = db.query(Mensagem)
     if pedido.cliente_id:
@@ -56,13 +61,12 @@ def gerar_relatorio(pedido: RelatorioRequest, db: Session = Depends(get_db)):
         "intencoes": intencoes,
         "reclamacoes": reclamacoes,
         "urgencia_alta": alta,
-        "amostra": [
+        "amostra_classificada": [
             {
                 "intencao": mensagem.intencao,
                 "urgencia": mensagem.urgencia,
                 "sentimento": mensagem.sentimento,
                 "origem": mensagem.origem_resposta,
-                "texto": mensagem.texto[:180],
             }
             for mensagem in mensagens[:15]
         ],

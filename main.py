@@ -3,12 +3,10 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import inspect, text
-
-from database import Base, engine
+from database import engine
+from migrations import ensure_schema
 from routers.clientes import router as clientes_router
 from routers.dashboard import router as dashboard_router
 from routers.mensagens import router as mensagens_router
@@ -17,30 +15,7 @@ from routers.relatorios import router as relatorios_router
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 
 
-def _ensure_schema() -> None:
-    """Cria tabelas novas e adiciona colunas do CP2 em bancos do CP1."""
-    Base.metadata.create_all(bind=engine)
-    inspector = inspect(engine)
-    if "mensagens" not in inspector.get_table_names():
-        return
-    existentes = {coluna["name"] for coluna in inspector.get_columns("mensagens")}
-    alteracoes = {
-        "intencao": "ALTER TABLE mensagens ADD COLUMN intencao VARCHAR(40) NOT NULL DEFAULT 'outros'",
-        "urgencia": "ALTER TABLE mensagens ADD COLUMN urgencia VARCHAR(20) NOT NULL DEFAULT 'baixa'",
-        "sentimento": "ALTER TABLE mensagens ADD COLUMN sentimento VARCHAR(20) NOT NULL DEFAULT 'neutro'",
-        "origem_resposta": "ALTER TABLE mensagens ADD COLUMN origem_resposta VARCHAR(20) NOT NULL DEFAULT 'regras'",
-    }
-    with engine.begin() as conexao:
-        for coluna, sql in alteracoes.items():
-            if coluna not in existentes:
-                conexao.execute(text(sql))
-        if "clientes" in inspector.get_table_names():
-            clientes_cols = {coluna["name"] for coluna in inspector.get_columns("clientes")}
-            if "criado_em" not in clientes_cols:
-                conexao.execute(text("ALTER TABLE clientes ADD COLUMN criado_em DATETIME"))
-
-
-_ensure_schema()
+ensure_schema(engine)
 
 app = FastAPI(
     title="Luca.AI BOT",
@@ -50,13 +25,6 @@ app = FastAPI(
     ),
     version="2.0.0",
     contact={"name": "Luca.AI BOT"},
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 app.include_router(clientes_router)

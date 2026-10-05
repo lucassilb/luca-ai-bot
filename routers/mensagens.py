@@ -16,7 +16,7 @@ router = APIRouter(prefix="/mensagens", tags=["Mensagens"])
     summary="Enviar mensagem para o Luca.AI BOT",
     description=(
         "Recebe a mensagem do cliente, classifica a intenção, gera resposta "
-        "(LLM se configurada, senão regras) e grava no histórico."
+        "(Ollama local se ativo, senão regras) e grava no histórico."
     ),
     responses={
         201: {"description": "Mensagem processada com sucesso."},

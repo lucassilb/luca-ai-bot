@@ -37,4 +37,4 @@ mensagens
 
 ## Migração
 
-`main._ensure_schema()` faz `CREATE TABLE` e `ALTER TABLE ... ADD COLUMN` no SQLite existente do CP1. Sem Alembic neste checkpoint (um arquivo local, sem deploy multi-ambiente).
+`migrations.ensure_schema()` cria tabelas novas e, no banco CP1, adiciona `clientes.criado_em` e recria `mensagens` com FK `ON DELETE CASCADE`, colunas de classificação e índices. A operação ocorre em transação. Mensagens com `cliente_id` inexistente são preservadas em `mensagens_orfas_cp1`, pois não podem entrar em uma tabela com integridade referencial. A migração pode ser executada novamente sem duplicar os dados. Sem Alembic neste checkpoint (um arquivo local, sem deploy multi-ambiente).
