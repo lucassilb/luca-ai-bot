@@ -25,6 +25,7 @@ A LLM não é um chat genérico: ela classifica e responde *a mensagem do client
 | 569268 | Caio Apolinario |
 | 570557 | Lucas Herrero |
 | 570110 | Arthur Lins |
+| 573213 | Gustavo Santin |
 
 ## O que mudou em relação ao CP1
 
